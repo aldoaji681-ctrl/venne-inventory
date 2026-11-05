@@ -5,25 +5,14 @@ import {
   Boxes, 
   ArrowDownToLine, 
   ArrowUpFromLine, 
-  ClipboardCheck, 
   History, 
   FileSpreadsheet, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Search, 
-  Filter, 
   Plus, 
   Download, 
-  Upload, 
-  AlertTriangle, 
-  CheckCircle2, 
-  TrendingUp, 
-  RefreshCw, 
-  ShieldAlert,
   ChevronRight,
-  Eye,
-  Info
+  Info,
+  Menu,
+  X
 } from 'lucide-react';
 
 // Seed Series Jaket Venne Kids
@@ -36,6 +25,7 @@ const INITIAL_SERIES = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false); // State untuk menu mobile
   const [currentUser, setCurrentUser] = useState({
     id: 'USR-01',
     name: 'Aldo (Owner)',
@@ -66,11 +56,6 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [stockOpnames, setStockOpnames] = useState(() => {
-    const saved = localStorage.getItem('vk_opname');
-    return saved ? JSON.parse(saved) : [];
-  });
-
   // Simpan perubahan ke LocalStorage
   useEffect(() => {
     localStorage.setItem('vk_products', JSON.stringify(products));
@@ -83,10 +68,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('vk_transactions', JSON.stringify(transactions));
   }, [transactions]);
-
-  useEffect(() => {
-    localStorage.setItem('vk_opname', JSON.stringify(stockOpnames));
-  }, [stockOpnames]);
 
   // Kalkulasi Stok Aktual Otomatis
   const inventoryData = useMemo(() => {
@@ -180,7 +161,7 @@ export default function App() {
     }
 
     if (txModal === 'OUT' && txForm.qty > selectedSku.actualStock) {
-      if (txForm.category !== 'Koreksi stok negatif' || currentUser.role !== 'OWNER') {
+      if (txForm.channel !== 'Koreksi stok negatif' || currentUser.role !== 'OWNER') {
         alert('Stok tidak mencukupi! Hanya OWNER yang dapat melakukan pengurangan melebihi stok via Koreksi Stok Negatif.');
         return;
       }
@@ -234,18 +215,37 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] text-slate-800 font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col justify-between">
+    <div className="flex h-screen bg-[#F8FAFC] text-slate-800 font-sans overflow-hidden">
+      {/* Overlay Gelap saat Sidebar dibuka di HP */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-xs"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Responsif (Drawer di Mobile, Tetap di Desktop) */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-[#0F172A] text-slate-300 flex flex-col justify-between transform transition-transform duration-200 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
         <div>
-          <div className="p-6 border-b border-slate-800">
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Boxes className="text-blue-500 w-6 h-6" /> VENNE KIDS
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Inventory System</p>
+          <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                <Boxes className="text-blue-500 w-6 h-6 shrink-0" /> VENNE KIDS
+              </h1>
+              <p className="text-[11px] text-slate-400 mt-0.5 uppercase tracking-wider font-semibold">Inventory System</p>
+            </div>
+            {/* Tombol Tutup Sidebar di HP */}
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <nav className="p-4 space-y-1">
+          <nav className="p-3 space-y-1">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'products', label: 'Katalog Series', icon: Package },
@@ -258,13 +258,16 @@ export default function App() {
               return (
                 <button
                   key={menu.id}
-                  onClick={() => setActiveTab(menu.id)}
+                  onClick={() => {
+                    setActiveTab(menu.id);
+                    setSidebarOpen(false); // Otomatis tutup sidebar di HP saat pilih menu
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                     isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'hover:bg-slate-800/60 hover:text-white'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {menu.label}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{menu.label}</span>
                 </button>
               );
             })}
@@ -275,7 +278,7 @@ export default function App() {
         <div className="p-4 border-t border-slate-800">
           <div className="bg-slate-800/60 p-3 rounded-lg mb-2">
             <div className="text-xs text-slate-400">Login Sebagai:</div>
-            <div className="text-sm font-semibold text-white">{currentUser.name}</div>
+            <div className="text-sm font-semibold text-white truncate">{currentUser.name}</div>
             <div className="text-[10px] font-bold text-blue-400 mt-0.5 tracking-wider uppercase">{currentUser.role}</div>
           </div>
           <div className="flex gap-1">
@@ -283,7 +286,7 @@ export default function App() {
               <button
                 key={r}
                 onClick={() => setCurrentUser({ id: `USR-${r}`, name: `Staff ${r}`, role: r })}
-                className={`flex-1 py-1 text-[10px] font-semibold rounded border ${
+                className={`flex-1 py-1.5 text-[10px] font-semibold rounded border transition ${
                   currentUser.role === r ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-700 text-slate-400 hover:text-white'
                 }`}
               >
@@ -295,90 +298,102 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800 capitalize">
-            {activeTab.replace('-', ' ')}
-          </h2>
-          <div className="flex items-center gap-3">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header Responsif */}
+        <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 -ml-1 text-slate-600 hover:bg-slate-100 rounded-lg"
+              aria-label="Buka Menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h2 className="text-base md:text-lg font-bold text-slate-800 capitalize truncate">
+              {activeTab.replace('-', ' ')}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setTxModal('IN')}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-semibold px-3 md:px-4 py-2 rounded-lg transition shadow-xs"
             >
-              <ArrowDownToLine className="w-4 h-4" /> Barang Masuk
+              <ArrowDownToLine className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Barang</span> Masuk
             </button>
             <button
               onClick={() => setTxModal('OUT')}
-              className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs md:text-sm font-semibold px-3 md:px-4 py-2 rounded-lg transition shadow-xs"
             >
-              <ArrowUpFromLine className="w-4 h-4" /> Barang Keluar
+              <ArrowUpFromLine className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Barang</span> Keluar
             </button>
           </div>
         </header>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              {/* Stat Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total SKU Aktif</div>
-                  <div className="text-3xl font-extrabold text-slate-800 mt-2">{stats.totalSKU}</div>
-                  <div className="text-xs text-slate-500 mt-1">Variasi Warna & Ukuran</div>
+              {/* Stat Cards: 2 kolom di HP, 4 kolom di Desktop */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[11px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Total SKU Aktif</div>
+                  <div className="text-2xl md:text-3xl font-extrabold text-slate-800 mt-1 md:mt-2">{stats.totalSKU}</div>
+                  <div className="text-[11px] md:text-xs text-slate-500 mt-1">Variasi Warna & Ukuran</div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Stok Fisik</div>
-                  <div className="text-3xl font-extrabold text-blue-600 mt-2">{stats.totalStock}</div>
-                  <div className="text-xs text-slate-500 mt-1">Pcs Tersisa di Gudang</div>
+                <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[11px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Stok Fisik</div>
+                  <div className="text-2xl md:text-3xl font-extrabold text-blue-600 mt-1 md:mt-2">{stats.totalStock}</div>
+                  <div className="text-[11px] md:text-xs text-slate-500 mt-1">Pcs Tersisa di Gudang</div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Barang Keluar</div>
-                  <div className="text-3xl font-extrabold text-rose-600 mt-2">{stats.totalOut}</div>
-                  <div className="text-xs text-slate-500 mt-1">Total keluar ({stats.outPercentage}%)</div>
+                <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[11px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Barang Keluar</div>
+                  <div className="text-2xl md:text-3xl font-extrabold text-rose-600 mt-1 md:mt-2">{stats.totalOut}</div>
+                  <div className="text-[11px] md:text-xs text-slate-500 mt-1">Total keluar ({stats.outPercentage}%)</div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stok Menipis / Habis</div>
-                  <div className="text-3xl font-extrabold text-amber-500 mt-2">
-                    {stats.lowStockCount} <span className="text-sm font-normal text-slate-400">/ {stats.outOfStockCount} Habis</span>
+                <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[11px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Stok Menipis / Habis</div>
+                  <div className="text-2xl md:text-3xl font-extrabold text-amber-500 mt-1 md:mt-2">
+                    {stats.lowStockCount} <span className="text-xs md:text-sm font-normal text-slate-400">/ {stats.outOfStockCount}</span>
                   </div>
-                  <div className="text-xs text-amber-600 mt-1">Perlu Restock Produksi</div>
+                  <div className="text-[11px] md:text-xs text-amber-600 mt-1">Perlu Restock</div>
                 </div>
               </div>
 
               {/* Table Preview */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 md:p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-slate-800">Status Stok Cepat</h3>
-                  <button onClick={() => setActiveTab('inventory')} className="text-sm text-blue-600 hover:underline flex items-center gap-1 font-semibold">
-                    Lihat Seluruh Stok <ChevronRight className="w-4 h-4" />
+                  <h3 className="font-bold text-slate-800 text-sm md:text-base">Status Stok Cepat</h3>
+                  <button onClick={() => setActiveTab('inventory')} className="text-xs md:text-sm text-blue-600 hover:underline flex items-center gap-1 font-semibold">
+                    Lihat Semua <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                  <table className="w-full text-left text-xs md:text-sm min-w-[480px]">
                     <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs uppercase">
-                        <th className="pb-3">SKU</th>
-                        <th className="pb-3">Series</th>
-                        <th className="pb-3">Warna / Size</th>
-                        <th className="pb-3">Stok Aktual</th>
-                        <th className="pb-3">Status</th>
+                      <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px] uppercase">
+                        <th className="pb-3 pr-2">SKU</th>
+                        <th className="pb-3 px-2">Series</th>
+                        <th className="pb-3 px-2">Warna / Size</th>
+                        <th className="pb-3 px-2">Stok Aktual</th>
+                        <th className="pb-3 pl-2">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {inventoryData.slice(0, 5).map(item => (
                         <tr key={item.id} className="hover:bg-slate-50">
-                          <td className="py-3 font-mono font-semibold text-slate-700">{item.skuCode}</td>
-                          <td className="py-3 font-medium text-slate-800">{item.series}</td>
-                          <td className="py-3 text-slate-600">{item.color} - Size {item.size}</td>
-                          <td className="py-3 font-bold text-slate-900">{item.actualStock} pcs</td>
-                          <td className="py-3">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          <td className="py-3 pr-2 font-mono font-semibold text-slate-700">{item.skuCode}</td>
+                          <td className="py-3 px-2 font-medium text-slate-800">{item.series}</td>
+                          <td className="py-3 px-2 text-slate-600">{item.color} - Size {item.size}</td>
+                          <td className="py-3 px-2 font-bold text-slate-900">{item.actualStock} pcs</td>
+                          <td className="py-3 pl-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${
                               item.status === 'In Stock' ? 'bg-emerald-50 text-emerald-600' :
                               item.status === 'Low Stock' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
                             }`}>
@@ -389,8 +404,8 @@ export default function App() {
                       ))}
                       {inventoryData.length === 0 && (
                         <tr>
-                          <td colSpan="5" className="py-8 text-center text-slate-400">
-                            Belum ada variasi SKU. Klik menu <strong>Inventory / Stok</strong> untuk menambahkan variasi pertama.
+                          <td colSpan="5" className="py-8 text-center text-slate-400 text-xs md:text-sm">
+                            Belum ada variasi SKU. Buka menu <strong>Inventory / Stok</strong> untuk menambahkan variasi pertama.
                           </td>
                         </tr>
                       )}
@@ -403,64 +418,150 @@ export default function App() {
 
           {/* INVENTORY / STOK TAB */}
           {activeTab === 'inventory' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
-                <div className="flex gap-2">
+            <div className="space-y-4 md:space-y-6">
+              <div className="flex flex-wrap justify-between items-center gap-2 bg-white p-3 md:p-4 rounded-xl border border-slate-200">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => setSkuModal(true)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm"
+                    className="flex-1 sm:flex-initial justify-center flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold px-4 py-2.5 rounded-lg shadow-xs"
                   >
                     <Plus className="w-4 h-4" /> Tambah Variasi SKU
                   </button>
                   <button
                     onClick={exportCSV}
-                    className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg"
+                    className="flex-1 sm:flex-initial justify-center flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs md:text-sm font-semibold px-4 py-2.5 rounded-lg"
                   >
                     <Download className="w-4 h-4" /> Export CSV
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-xs uppercase">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs md:text-sm min-w-[640px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px] uppercase">
+                      <tr>
+                        <th className="p-3 md:p-4">SKU</th>
+                        <th className="p-3 md:p-4">Series</th>
+                        <th className="p-3 md:p-4">Warna</th>
+                        <th className="p-3 md:p-4">Ukuran</th>
+                        <th className="p-3 md:p-4 text-center">Stok Awal</th>
+                        <th className="p-3 md:p-4 text-center text-emerald-600">Masuk</th>
+                        <th className="p-3 md:p-4 text-center text-rose-600">Keluar</th>
+                        <th className="p-3 md:p-4 text-center font-bold">Stok Aktual</th>
+                        <th className="p-3 md:p-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {inventoryData.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50">
+                          <td className="p-3 md:p-4 font-mono font-bold text-blue-600 whitespace-nowrap">{item.skuCode}</td>
+                          <td className="p-3 md:p-4 font-semibold text-slate-800">{item.series}</td>
+                          <td className="p-3 md:p-4 text-slate-600">{item.color}</td>
+                          <td className="p-3 md:p-4 text-slate-600">{item.size}</td>
+                          <td className="p-3 md:p-4 text-center text-slate-500">{item.initialStock}</td>
+                          <td className="p-3 md:p-4 text-center font-medium text-emerald-600">+{item.totalIn}</td>
+                          <td className="p-3 md:p-4 text-center font-medium text-rose-600">-{item.totalOut}</td>
+                          <td className="p-3 md:p-4 text-center font-extrabold text-slate-900 bg-slate-50/50">{item.actualStock}</td>
+                          <td className="p-3 md:p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${
+                              item.status === 'In Stock' ? 'bg-emerald-50 text-emerald-600' :
+                              item.status === 'Low Stock' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                            }`}>
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {inventoryData.length === 0 && (
+                        <tr>
+                          <td colSpan="9" className="p-8 text-center text-slate-400">
+                            Data inventory masih kosong. Klik tombol <strong>Tambah Variasi SKU</strong> di atas.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* KATALOG SERIES TAB */}
+          {activeTab === 'products' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 md:p-4 rounded-xl flex items-start md:items-center gap-3 text-xs md:text-sm">
+                <Info className="w-5 h-5 shrink-0 text-blue-600 mt-0.5 md:mt-0" />
+                <span>
+                  Katalog awal berisi <strong>22 Series Jaket Venne Kids</strong>. Stok diatur per variasi melalui menu <strong>Inventory / Stok</strong>.
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                {products.map(p => (
+                  <div key={p.id} className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-xs hover:border-blue-400 transition">
+                    <div className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">{p.category}</div>
+                    <div className="text-sm md:text-lg font-bold text-slate-800 mt-1 truncate">{p.series}</div>
+                    <div className="text-xs text-slate-400 mt-1.5 line-clamp-2">{p.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* RIWAYAT TRANSAKSI TAB */}
+          {activeTab === 'history' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs md:text-sm min-w-[600px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px] uppercase">
                     <tr>
-                      <th className="p-4">SKU</th>
-                      <th className="p-4">Series</th>
-                      <th className="p-4">Warna</th>
-                      <th className="p-4">Ukuran</th>
-                      <th className="p-4 text-center">Stok Awal</th>
-                      <th className="p-4 text-center text-emerald-600">Masuk</th>
-                      <th className="p-4 text-center text-rose-600">Keluar</th>
-                      <th className="p-4 text-center font-bold">Stok Aktual</th>
-                      <th className="p-4">Status</th>
+                      <th className="p-3 md:p-4">Waktu</th>
+                      <th className="p-3 md:p-4">SKU / Series</th>
+                      <th className="p-3 md:p-4">Tipe</th>
+                      <th className="p-3 md:p-4">Kategori / Saluran</th>
+                      <th className="p-3 md:p-4">Jumlah</th>
+                      <th className="p-3 md:p-4">User</th>
+                      <th className="p-3 md:p-4">Aksi (Owner)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {inventoryData.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50">
-                        <td className="p-4 font-mono font-bold text-blue-600">{item.skuCode}</td>
-                        <td className="p-4 font-semibold text-slate-800">{item.series}</td>
-                        <td className="p-4 text-slate-600">{item.color}</td>
-                        <td className="p-4 text-slate-600">{item.size}</td>
-                        <td className="p-4 text-center text-slate-500">{item.initialStock}</td>
-                        <td className="p-4 text-center font-medium text-emerald-600">+{item.totalIn}</td>
-                        <td className="p-4 text-center font-medium text-rose-600">-{item.totalOut}</td>
-                        <td className="p-4 text-center font-extrabold text-slate-900 bg-slate-50/50">{item.actualStock}</td>
-                        <td className="p-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            item.status === 'In Stock' ? 'bg-emerald-50 text-emerald-600' :
-                            item.status === 'Low Stock' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                    {transactions.map(t => (
+                      <tr key={t.id} className={t.isReversed ? 'bg-slate-50 opacity-50' : 'hover:bg-slate-50'}>
+                        <td className="p-3 md:p-4 text-xs text-slate-500 whitespace-nowrap">{t.createdAt}</td>
+                        <td className="p-3 md:p-4">
+                          <div className="font-mono font-bold text-slate-800">{t.skuCode}</div>
+                          <div className="text-xs text-slate-400">{t.series} ({t.color} - {t.size})</div>
+                        </td>
+                        <td className="p-3 md:p-4">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            t.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                           }`}>
-                            {item.status}
+                            {t.type}
                           </span>
+                        </td>
+                        <td className="p-3 md:p-4 text-slate-600">{t.category}</td>
+                        <td className="p-3 md:p-4 font-bold text-slate-900 whitespace-nowrap">{t.qty} pcs</td>
+                        <td className="p-3 md:p-4 text-xs text-slate-600">{t.user}</td>
+                        <td className="p-3 md:p-4">
+                          {t.isReversed ? (
+                            <span className="text-xs text-rose-500 font-semibold italic">Dibatalkan</span>
+                          ) : (
+                            currentUser.role === 'OWNER' && (
+                              <button
+                                onClick={() => handleReverseTransaction(t.id)}
+                                className="text-xs font-semibold text-rose-600 hover:underline"
+                              >
+                                Reversal
+                              </button>
+                            )
+                          )}
                         </td>
                       </tr>
                     ))}
-                    {inventoryData.length === 0 && (
+                    {transactions.length === 0 && (
                       <tr>
-                        <td colSpan="9" className="p-8 text-center text-slate-400">
-                          Data inventory masih kosong. Klik tombol <strong>Tambah Variasi SKU</strong> untuk memasukkan warna dan ukuran series.
+                        <td colSpan="7" className="p-8 text-center text-slate-400">
+                          Belum ada catatan transaksi barang masuk atau keluar.
                         </td>
                       </tr>
                     )}
@@ -470,99 +571,17 @@ export default function App() {
             </div>
           )}
 
-          {/* KATALOG SERIES TAB */}
-          {activeTab === 'products' && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-xl flex items-center gap-3 text-sm">
-                <Info className="w-5 h-5 flex-shrink-0 text-blue-600" />
-                <span>
-                  Katalog awal berisi <strong>22 Series Jaket Venne Kids</strong> yang berhasil teridentifikasi. Stok diatur per SKU melalui menu <strong>Inventory / Stok</strong>.
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {products.map(p => (
-                  <div key={p.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition">
-                    <div className="text-xs font-bold text-blue-600 tracking-wider uppercase">{p.category}</div>
-                    <div className="text-lg font-bold text-slate-800 mt-1">{p.series}</div>
-                    <div className="text-xs text-slate-400 mt-2">{p.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* RIWAYAT TRANSAKSI TAB */}
-          {activeTab === 'history' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-xs uppercase">
-                  <tr>
-                    <th className="p-4">Waktu</th>
-                    <th className="p-4">SKU / Series</th>
-                    <th className="p-4">Tipe</th>
-                    <th className="p-4">Kategori / Saluran</th>
-                    <th className="p-4">Jumlah</th>
-                    <th className="p-4">User</th>
-                    <th className="p-4">Aksi (Owner)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {transactions.map(t => (
-                    <tr key={t.id} className={t.isReversed ? 'bg-slate-50 opacity-50' : 'hover:bg-slate-50'}>
-                      <td className="p-4 text-xs text-slate-500">{t.createdAt}</td>
-                      <td className="p-4">
-                        <div className="font-mono font-bold text-slate-800">{t.skuCode}</div>
-                        <div className="text-xs text-slate-400">{t.series} ({t.color} - {t.size})</div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          t.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                        }`}>
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-600">{t.category}</td>
-                      <td className="p-4 font-bold text-slate-900">{t.qty} pcs</td>
-                      <td className="p-4 text-xs text-slate-600">{t.user}</td>
-                      <td className="p-4">
-                        {t.isReversed ? (
-                          <span className="text-xs text-rose-500 font-semibold italic">Dibatalkan</span>
-                        ) : (
-                          currentUser.role === 'OWNER' && (
-                            <button
-                              onClick={() => handleReverseTransaction(t.id)}
-                              className="text-xs font-semibold text-rose-600 hover:underline"
-                            >
-                              Reversal
-                            </button>
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {transactions.length === 0 && (
-                    <tr>
-                      <td colSpan="7" className="p-8 text-center text-slate-400">
-                        Belum ada catatan transaksi barang masuk atau keluar.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* LAPORAN TAB */}
           {activeTab === 'reports' && (
-            <div className="bg-white p-8 rounded-xl border border-slate-200 text-center">
-              <FileSpreadsheet className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-800">Export Laporan Gudang</h3>
-              <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
+            <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 text-center">
+              <FileSpreadsheet className="w-10 h-10 md:w-12 md:h-12 text-blue-600 mx-auto mb-3" />
+              <h3 className="text-base md:text-lg font-bold text-slate-800">Export Laporan Gudang</h3>
+              <p className="text-xs md:text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
                 Unduh rekapitulasi data persediaan barang secara komprehensif dalam format CSV untuk diolah lebih lanjut di Excel.
               </p>
               <button
                 onClick={exportCSV}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg inline-flex items-center gap-2 shadow-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold px-5 py-2.5 rounded-lg inline-flex items-center gap-2 shadow-xs"
               >
                 <Download className="w-4 h-4" /> Download Laporan Inventory (.CSV)
               </button>
@@ -573,9 +592,9 @@ export default function App() {
 
       {/* MODAL TAMBAH VARIANT / SKU */}
       {skuModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Tambah Variasi SKU Baru</h3>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 md:p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4">Tambah Variasi SKU Baru</h3>
             <form onSubmit={handleCreateSku} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Pilih Series Jaket</label>
@@ -594,7 +613,7 @@ export default function App() {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Navy, Black, Sage"
+                    placeholder="Navy, Black"
                     value={newSku.color}
                     onChange={e => setNewSku({ ...newSku, color: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
@@ -605,7 +624,7 @@ export default function App() {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: 4, 6, 8, 10"
+                    placeholder="4, 6, 8, 10"
                     value={newSku.size}
                     onChange={e => setNewSku({ ...newSku, size: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
@@ -658,9 +677,9 @@ export default function App() {
 
       {/* MODAL INPUT TRANSAKSI (IN / OUT) */}
       {txModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 md:p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4">
               Form {txModal === 'IN' ? 'Barang Masuk (Stock In)' : 'Barang Keluar (Stock Out)'}
             </h3>
             <form onSubmit={handleAddTransaction} className="space-y-4">
