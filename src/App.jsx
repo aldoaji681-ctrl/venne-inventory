@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
-  Package, 
+  Palette, 
   Boxes, 
   ArrowDownToLine, 
   ArrowUpFromLine, 
@@ -10,9 +10,11 @@ import {
   Plus, 
   Download, 
   ChevronRight,
+  ChevronDown,
   Info,
   Menu,
-  X
+  X,
+  Search
 } from 'lucide-react';
 
 // Seed Series Jaket Venne Kids
@@ -23,9 +25,57 @@ const INITIAL_SERIES = [
   'Hrly', 'Arka', 'Chester', 'Hero Series Atrax'
 ];
 
+// 15 Warna Polos
+const SOLID_COLORS = [
+  { name: 'Denim', code: 'DNM', hex: '#4A6B82' },
+  { name: 'Mustard', code: 'MST', hex: '#D99B26' },
+  { name: 'Mint', code: 'MNT', hex: '#98D8C8' },
+  { name: 'Dusty Pink', code: 'DPK', hex: '#DCAE96' },
+  { name: 'Hitam', code: 'BLK', hex: '#1E293B' },
+  { name: 'Dark Grey', code: 'DGR', hex: '#4B5563' },
+  { name: 'Cream', code: 'CRM', hex: '#F5E6D3' },
+  { name: 'Cappucino', code: 'CPC', hex: '#A67B5B' },
+  { name: 'Burgundy', code: 'BRG', hex: '#6D1A36' },
+  { name: 'Navy', code: 'NVY', hex: '#1B2A4A' },
+  { name: 'Caramel', code: 'CML', hex: '#C67D3B' },
+  { name: 'Olive', code: 'OLV', hex: '#556B2F' },
+  { name: 'Sky Blue', code: 'SKY', hex: '#7BC4E2' },
+  { name: 'Lilac', code: 'LLC', hex: '#C8A2C8' },
+  { name: 'Coffee', code: 'CFE', hex: '#4B3621' }
+];
+
+// Pasangan Dasar Warna Kombinasi (Otomatis digenerate beserta kebalikannya)
+const COMBO_PAIRS = [
+  ['CP', 'Denim', 'CPDNM', 'DNMCP', '#A67B5B', '#4A6B82'],
+  ['CP', 'Mustard', 'CPMST', 'MSTCP', '#A67B5B', '#D99B26'],
+  ['CP', 'Olive', 'CPOLV', 'OLVCP', '#A67B5B', '#556B2F'],
+  ['CP', 'Dusty Pink', 'CPDPK', 'DPKCP', '#A67B5B', '#DCAE96'],
+  ['CP', 'Mint', 'CPMNT', 'MNTCP', '#A67B5B', '#98D8C8'],
+  ['CP', 'Dark Grey', 'CPDGR', 'DGRCP', '#A67B5B', '#4B5563'],
+  ['CP', 'Coffee', 'CPCFE', 'CFECP', '#A67B5B', '#4B3621'],
+  ['CP', 'Burgundy', 'CPBRG', 'BRGCP', '#A67B5B', '#6D1A36'],
+  ['WH', 'Caramel', 'WHCML', 'CMLWH', '#FFFFFF', '#C67D3B'],
+  ['WH', 'Navy', 'WHNVY', 'NVYWH', '#FFFFFF', '#1B2A4A'],
+  ['Navy', 'Mustard', 'NVYMST', 'MSTNVY', '#1B2A4A', '#D99B26']
+];
+
+const COMBO_COLORS = COMBO_PAIRS.flatMap(([c1, c2, code1, code2, hex1, hex2]) => [
+  { name: `${c1}-${c2}`, code: code1, hex: hex1, hex2: hex2, isCombo: true },
+  { name: `${c2}-${c1}`, code: code2, hex: hex2, hex2: hex1, isCombo: true }
+]);
+
+const ALL_COLORS = [
+  ...SOLID_COLORS.map(c => ({ ...c, type: 'Polos' })),
+  ...COMBO_COLORS.map(c => ({ ...c, type: 'Kombinasi' }))
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false); // State untuk menu mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [openColorDrawer, setOpenColorDrawer] = useState(null);
+  const [colorFilterType, setColorFilterType] = useState('ALL'); // ALL, Polos, Kombinasi
+  const [colorSearch, setColorSearch] = useState('');
+
   const [currentUser, setCurrentUser] = useState({
     id: 'USR-01',
     name: 'Aldo (Owner)',
@@ -33,19 +83,6 @@ export default function App() {
   });
 
   // State Data Operasional
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('vk_products');
-    if (saved) return JSON.parse(saved);
-    return INITIAL_SERIES.map((name, idx) => ({
-      id: `PRD-${idx + 1}`,
-      name: `Jaket ${name}`,
-      category: 'Jaket',
-      series: name,
-      description: `Original kids collection ${name} series.`,
-      status: 'Active'
-    }));
-  });
-
   const [skus, setSkus] = useState(() => {
     const saved = localStorage.getItem('vk_skus');
     return saved ? JSON.parse(saved) : [];
@@ -55,11 +92,6 @@ export default function App() {
     const saved = localStorage.getItem('vk_transactions');
     return saved ? JSON.parse(saved) : [];
   });
-
-  // Simpan perubahan ke LocalStorage
-  useEffect(() => {
-    localStorage.setItem('vk_products', JSON.stringify(products));
-  }, [products]);
 
   useEffect(() => {
     localStorage.setItem('vk_skus', JSON.stringify(skus));
@@ -91,6 +123,50 @@ export default function App() {
     });
   }, [skus, transactions]);
 
+  // Rekap Data Berdasarkan Warna untuk Drawer Katalog Warna
+  const colorCatalogData = useMemo(() => {
+    return ALL_COLORS.map(colorObj => {
+      const matchingSkus = inventoryData.filter(
+        item => item.color.toLowerCase() === colorObj.name.toLowerCase()
+      );
+      const totalJaket = matchingSkus.reduce((acc, curr) => acc + curr.actualStock, 0);
+
+      // Kelompokkan berdasarkan Series
+      const seriesBreakdown = {};
+      matchingSkus.forEach(item => {
+        if (!seriesBreakdown[item.series]) {
+          seriesBreakdown[item.series] = {
+            series: item.series,
+            totalSeriesStock: 0,
+            sizes: []
+          };
+        }
+        seriesBreakdown[item.series].totalSeriesStock += item.actualStock;
+        seriesBreakdown[item.series].sizes.push({
+          skuCode: item.skuCode,
+          size: item.size,
+          stock: item.actualStock,
+          status: item.status
+        });
+      });
+
+      return {
+        ...colorObj,
+        totalJaket,
+        skuCount: matchingSkus.length,
+        seriesList: Object.values(seriesBreakdown)
+      };
+    });
+  }, [inventoryData]);
+
+  const filteredColors = useMemo(() => {
+    return colorCatalogData.filter(c => {
+      const matchType = colorFilterType === 'ALL' || c.type === colorFilterType;
+      const matchSearch = c.name.toLowerCase().includes(colorSearch.toLowerCase());
+      return matchType && matchSearch;
+    });
+  }, [colorCatalogData, colorFilterType, colorSearch]);
+
   // Statistik Dashboard
   const stats = useMemo(() => {
     const totalSKU = inventoryData.length;
@@ -102,16 +178,15 @@ export default function App() {
 
     const baseStock = inventoryData.reduce((acc, i) => acc + (i.initialStock || 0), 0) + totalIn;
     const outPercentage = baseStock > 0 ? ((totalOut / baseStock) * 100).toFixed(1) : 0;
-    const remainingPercentage = baseStock > 0 ? ((totalStock / baseStock) * 100).toFixed(1) : 0;
 
-    return { totalSKU, totalStock, totalIn, totalOut, lowStockCount, outOfStockCount, outPercentage, remainingPercentage };
+    return { totalSKU, totalStock, totalIn, totalOut, lowStockCount, outOfStockCount, outPercentage };
   }, [inventoryData, transactions]);
 
   // Form Tambah SKU Baru
   const [skuModal, setSkuModal] = useState(false);
   const [newSku, setNewSku] = useState({
     series: INITIAL_SERIES[0],
-    color: 'Navy',
+    color: ALL_COLORS[0].name,
     size: '4',
     initialStock: 0,
     minStock: 5
@@ -119,10 +194,13 @@ export default function App() {
 
   const handleCreateSku = (e) => {
     e.preventDefault();
-    const generatedSku = `JKT-${newSku.series.replace(/\s+/g, '').toUpperCase().slice(0, 4)}-${newSku.color.toUpperCase().slice(0, 3)}-${newSku.size.padStart(2, '0')}`;
+    const colorObj = ALL_COLORS.find(c => c.name === newSku.color);
+    const colorCode = colorObj ? colorObj.code : newSku.color.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 4);
+    const seriesCode = newSku.series.replace(/\s+/g, '').toUpperCase().slice(0, 4);
+    const generatedSku = `JKT-${seriesCode}-${colorCode}-${newSku.size.padStart(2, '0')}`;
     
     if (skus.some(s => s.skuCode === generatedSku)) {
-      alert('SKU dengan variasi ini sudah ada!');
+      alert('SKU dengan variasi Series, Warna, dan Ukuran ini sudah ada!');
       return;
     }
 
@@ -142,7 +220,7 @@ export default function App() {
   };
 
   // Form Transaksi In / Out
-  const [txModal, setTxModal] = useState(null); // 'IN' atau 'OUT'
+  const [txModal, setTxModal] = useState(null);
   const [txForm, setTxForm] = useState({
     skuId: '',
     category: 'Hasil produksi',
@@ -224,7 +302,7 @@ export default function App() {
         />
       )}
 
-      {/* Sidebar Responsif (Drawer di Mobile, Tetap di Desktop) */}
+      {/* Sidebar Responsif */}
       <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-[#0F172A] text-slate-300 flex flex-col justify-between transform transition-transform duration-200 ease-in-out ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}>
@@ -236,7 +314,6 @@ export default function App() {
               </h1>
               <p className="text-[11px] text-slate-400 mt-0.5 uppercase tracking-wider font-semibold">Inventory System</p>
             </div>
-            {/* Tombol Tutup Sidebar di HP */}
             <button 
               onClick={() => setSidebarOpen(false)}
               className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg"
@@ -248,7 +325,7 @@ export default function App() {
           <nav className="p-3 space-y-1">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-              { id: 'products', label: 'Katalog Series', icon: Package },
+              { id: 'colors', label: 'Katalog Warna', icon: Palette },
               { id: 'inventory', label: 'Inventory / Stok', icon: Boxes },
               { id: 'history', label: 'Riwayat Transaksi', icon: History },
               { id: 'reports', label: 'Laporan', icon: FileSpreadsheet }
@@ -260,7 +337,7 @@ export default function App() {
                   key={menu.id}
                   onClick={() => {
                     setActiveTab(menu.id);
-                    setSidebarOpen(false); // Otomatis tutup sidebar di HP saat pilih menu
+                    setSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                     isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'hover:bg-slate-800/60 hover:text-white'
@@ -299,7 +376,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header Responsif */}
+        {/* Top Header */}
         <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -310,7 +387,7 @@ export default function App() {
               <Menu className="w-6 h-6" />
             </button>
             <h2 className="text-base md:text-lg font-bold text-slate-800 capitalize truncate">
-              {activeTab.replace('-', ' ')}
+              {activeTab === 'colors' ? 'Katalog Warna Jaket' : activeTab.replace('-', ' ')}
             </h2>
           </div>
 
@@ -337,12 +414,11 @@ export default function App() {
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              {/* Stat Cards: 2 kolom di HP, 4 kolom di Desktop */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                 <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
                   <div className="text-[11px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Total SKU Aktif</div>
                   <div className="text-2xl md:text-3xl font-extrabold text-slate-800 mt-1 md:mt-2">{stats.totalSKU}</div>
-                  <div className="text-[11px] md:text-xs text-slate-500 mt-1">Variasi Warna & Ukuran</div>
+                  <div className="text-[11px] md:text-xs text-slate-500 mt-1">37 Varian Warna Tersedia</div>
                 </div>
 
                 <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs">
@@ -366,12 +442,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Table Preview */}
+              {/* Ringkasan Cepat Katalog Warna di Dashboard */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 md:p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-slate-800 text-sm md:text-base">Status Stok Cepat</h3>
-                  <button onClick={() => setActiveTab('inventory')} className="text-xs md:text-sm text-blue-600 hover:underline flex items-center gap-1 font-semibold">
-                    Lihat Semua <ChevronRight className="w-4 h-4" />
+                  <button onClick={() => setActiveTab('colors')} className="text-xs md:text-sm text-blue-600 hover:underline flex items-center gap-1 font-semibold">
+                    Buka Drawer Warna <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
@@ -379,8 +455,8 @@ export default function App() {
                     <thead>
                       <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px] uppercase">
                         <th className="pb-3 pr-2">SKU</th>
-                        <th className="pb-3 px-2">Series</th>
-                        <th className="pb-3 px-2">Warna / Size</th>
+                        <th className="pb-3 px-2">Warna</th>
+                        <th className="pb-3 px-2">Series / Size</th>
                         <th className="pb-3 px-2">Stok Aktual</th>
                         <th className="pb-3 pl-2">Status</th>
                       </tr>
@@ -389,8 +465,8 @@ export default function App() {
                       {inventoryData.slice(0, 5).map(item => (
                         <tr key={item.id} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-mono font-semibold text-slate-700">{item.skuCode}</td>
-                          <td className="py-3 px-2 font-medium text-slate-800">{item.series}</td>
-                          <td className="py-3 px-2 text-slate-600">{item.color} - Size {item.size}</td>
+                          <td className="py-3 px-2 font-semibold text-slate-800">{item.color}</td>
+                          <td className="py-3 px-2 text-slate-600">{item.series} - Size {item.size}</td>
                           <td className="py-3 px-2 font-bold text-slate-900">{item.actualStock} pcs</td>
                           <td className="py-3 pl-2">
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${
@@ -405,13 +481,189 @@ export default function App() {
                       {inventoryData.length === 0 && (
                         <tr>
                           <td colSpan="5" className="py-8 text-center text-slate-400 text-xs md:text-sm">
-                            Belum ada variasi SKU. Buka menu <strong>Inventory / Stok</strong> untuk menambahkan variasi pertama.
+                            Belum ada variasi SKU. Buka menu <strong>Inventory / Stok</strong> atau <strong>Katalog Warna</strong> untuk menambahkan stok.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* KATALOG WARNA (DRAWER / ACCORDION) TAB */}
+          {activeTab === 'colors' && (
+            <div className="space-y-4">
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 md:p-4 rounded-xl flex items-start md:items-center justify-between gap-3 text-xs md:text-sm">
+                <div className="flex items-start md:items-center gap-3">
+                  <Info className="w-5 h-5 shrink-0 text-blue-600 mt-0.5 md:mt-0" />
+                  <span>
+                    Klik pada baris warna untuk membuka <strong>Drawer Rincian</strong> (Series, Ukuran, dan Jumlah Jaket per warna). Total <strong>15 Warna Polos</strong> & <strong>22 Warna Kombinasi</strong>.
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSkuModal(true)}
+                  className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-xs"
+                >
+                  <Plus className="w-4 h-4" /> Tambah SKU
+                </button>
+              </div>
+
+              {/* Filter & Pencarian Warna */}
+              <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                <div className="flex gap-1.5 bg-slate-100 p-1 rounded-lg">
+                  {[
+                    { id: 'ALL', label: `Semua (${ALL_COLORS.length})` },
+                    { id: 'Polos', label: `Warna Polos (${SOLID_COLORS.length})` },
+                    { id: 'Kombinasi', label: `Kombinasi (${COMBO_COLORS.length})` }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setColorFilterType(tab.id)}
+                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                        colorFilterType === tab.id ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Cari warna (misal: Olive, CP-Denim)..."
+                    value={colorSearch}
+                    onChange={e => setColorSearch(e.target.value)}
+                    className="w-full sm:w-64 pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Daftar Drawer Warna */}
+              <div className="space-y-2.5">
+                {filteredColors.map(colorItem => {
+                  const isOpen = openColorDrawer === colorItem.name;
+                  return (
+                    <div 
+                      key={colorItem.name} 
+                      className={`bg-white rounded-xl border transition-all overflow-hidden ${
+                        isOpen ? 'border-blue-500 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-xs'
+                      }`}
+                    >
+                      {/* Header Drawer Warna */}
+                      <button
+                        onClick={() => setOpenColorDrawer(isOpen ? null : colorItem.name)}
+                        className="w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/70 transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Indikator Bulatan Warna (Polos vs Kombinasi Belah Dua) */}
+                          {colorItem.isCombo ? (
+                            <div className="w-8 h-8 rounded-full border border-slate-300 overflow-hidden flex shrink-0 shadow-inner">
+                              <div className="w-1/2 h-full" style={{ backgroundColor: colorItem.hex }} />
+                              <div className="w-1/2 h-full" style={{ backgroundColor: colorItem.hex2 }} />
+                            </div>
+                          ) : (
+                            <div 
+                              className="w-8 h-8 rounded-full border border-slate-300 shrink-0 shadow-inner"
+                              style={{ backgroundColor: colorItem.hex }}
+                            />
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-800 text-sm md:text-base">{colorItem.name}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                colorItem.type === 'Polos' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600'
+                              }`}>
+                                {colorItem.type}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-400">#{colorItem.code}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {colorItem.seriesList.length > 0 
+                                ? `Tersedia di ${colorItem.seriesList.length} Series (${colorItem.skuCount} SKU)` 
+                                : 'Belum ada SKU terdaftar di warna ini'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className={`text-sm md:text-base font-extrabold ${
+                              colorItem.totalJaket > 0 ? 'text-blue-600' : 'text-slate-400'
+                            }`}>
+                              {colorItem.totalJaket} Jaket
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">Total Stok</div>
+                          </div>
+                          <div className={`p-1.5 rounded-lg transition-transform ${isOpen ? 'bg-blue-50 text-blue-600 rotate-180' : 'text-slate-400'}`}>
+                            <ChevronDown className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Isi Drawer (Muncul Saat Diklik) */}
+                      {isOpen && (
+                        <div className="border-t border-slate-100 bg-slate-50/70 p-4 space-y-3">
+                          {colorItem.seriesList.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {colorItem.seriesList.map(sGroup => (
+                                <div key={sGroup.series} className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+                                  <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2.5">
+                                    <div>
+                                      <span className="text-xs font-bold uppercase text-blue-600 tracking-wider">Series</span>
+                                      <h4 className="font-bold text-slate-800 text-sm">Jaket {sGroup.series}</h4>
+                                    </div>
+                                    <span className="bg-blue-50 text-blue-700 text-xs font-extrabold px-2.5 py-1 rounded-full">
+                                      Total: {sGroup.totalSeriesStock} pcs
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    {sGroup.sizes.map(sz => (
+                                      <div key={sz.skuCode} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono font-semibold text-slate-500">{sz.skuCode}</span>
+                                          <span className="font-bold text-slate-700">Ukuran {sz.size}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-extrabold text-slate-900">{sz.stock} pcs</span>
+                                          <span className={`w-2 h-2 rounded-full ${
+                                            sz.status === 'In Stock' ? 'bg-emerald-500' :
+                                            sz.status === 'Low Stock' ? 'bg-amber-500' : 'bg-rose-500'
+                                          }`} />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 bg-white rounded-lg border border-dashed border-slate-200">
+                              <p className="text-xs md:text-sm text-slate-500 mb-3">
+                                Belum ada jaket yang diinput untuk warna <strong>{colorItem.name}</strong>.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setNewSku({ ...newSku, color: colorItem.name });
+                                  setSkuModal(true);
+                                }}
+                                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg"
+                              >
+                                <Plus className="w-3.5 h-3.5" /> Tambah SKU Warna {colorItem.name}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -442,8 +694,8 @@ export default function App() {
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px] uppercase">
                       <tr>
                         <th className="p-3 md:p-4">SKU</th>
-                        <th className="p-3 md:p-4">Series</th>
                         <th className="p-3 md:p-4">Warna</th>
+                        <th className="p-3 md:p-4">Series</th>
                         <th className="p-3 md:p-4">Ukuran</th>
                         <th className="p-3 md:p-4 text-center">Stok Awal</th>
                         <th className="p-3 md:p-4 text-center text-emerald-600">Masuk</th>
@@ -456,8 +708,8 @@ export default function App() {
                       {inventoryData.map(item => (
                         <tr key={item.id} className="hover:bg-slate-50">
                           <td className="p-3 md:p-4 font-mono font-bold text-blue-600 whitespace-nowrap">{item.skuCode}</td>
-                          <td className="p-3 md:p-4 font-semibold text-slate-800">{item.series}</td>
-                          <td className="p-3 md:p-4 text-slate-600">{item.color}</td>
+                          <td className="p-3 md:p-4 font-semibold text-slate-800">{item.color}</td>
+                          <td className="p-3 md:p-4 text-slate-600">{item.series}</td>
                           <td className="p-3 md:p-4 text-slate-600">{item.size}</td>
                           <td className="p-3 md:p-4 text-center text-slate-500">{item.initialStock}</td>
                           <td className="p-3 md:p-4 text-center font-medium text-emerald-600">+{item.totalIn}</td>
@@ -487,27 +739,6 @@ export default function App() {
             </div>
           )}
 
-          {/* KATALOG SERIES TAB */}
-          {activeTab === 'products' && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 md:p-4 rounded-xl flex items-start md:items-center gap-3 text-xs md:text-sm">
-                <Info className="w-5 h-5 shrink-0 text-blue-600 mt-0.5 md:mt-0" />
-                <span>
-                  Katalog awal berisi <strong>22 Series Jaket Venne Kids</strong>. Stok diatur per variasi melalui menu <strong>Inventory / Stok</strong>.
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                {products.map(p => (
-                  <div key={p.id} className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-xs hover:border-blue-400 transition">
-                    <div className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">{p.category}</div>
-                    <div className="text-sm md:text-lg font-bold text-slate-800 mt-1 truncate">{p.series}</div>
-                    <div className="text-xs text-slate-400 mt-1.5 line-clamp-2">{p.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* RIWAYAT TRANSAKSI TAB */}
           {activeTab === 'history' && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -516,7 +747,7 @@ export default function App() {
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px] uppercase">
                     <tr>
                       <th className="p-3 md:p-4">Waktu</th>
-                      <th className="p-3 md:p-4">SKU / Series</th>
+                      <th className="p-3 md:p-4">SKU / Warna & Series</th>
                       <th className="p-3 md:p-4">Tipe</th>
                       <th className="p-3 md:p-4">Kategori / Saluran</th>
                       <th className="p-3 md:p-4">Jumlah</th>
@@ -530,7 +761,7 @@ export default function App() {
                         <td className="p-3 md:p-4 text-xs text-slate-500 whitespace-nowrap">{t.createdAt}</td>
                         <td className="p-3 md:p-4">
                           <div className="font-mono font-bold text-slate-800">{t.skuCode}</div>
-                          <div className="text-xs text-slate-400">{t.series} ({t.color} - {t.size})</div>
+                          <div className="text-xs text-slate-500">{t.color} • {t.series} (Size {t.size})</div>
                         </td>
                         <td className="p-3 md:p-4">
                           <span className={`px-2 py-0.5 rounded text-xs font-bold ${
@@ -597,34 +828,42 @@ export default function App() {
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4">Tambah Variasi SKU Baru</h3>
             <form onSubmit={handleCreateSku} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Pilih Series Jaket</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Pilih Warna Jaket</label>
                 <select
-                  value={newSku.series}
-                  onChange={e => setNewSku({ ...newSku, series: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                  value={newSku.color}
+                  onChange={e => setNewSku({ ...newSku, color: e.target.value })}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-medium"
                 >
-                  {INITIAL_SERIES.map(s => <option key={s} value={s}>{s}</option>)}
+                  <optgroup label="Warna Polos (15 Varian)">
+                    {SOLID_COLORS.map(c => (
+                      <option key={c.name} value={c.name}>{c.name} ({c.code})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Warna Kombinasi (22 Varian)">
+                    {COMBO_COLORS.map(c => (
+                      <option key={c.name} value={c.name}>{c.name} ({c.code})</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Warna</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Navy, Black"
-                    value={newSku.color}
-                    onChange={e => setNewSku({ ...newSku, color: e.target.value })}
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Pilih Series</label>
+                  <select
+                    value={newSku.series}
+                    onChange={e => setNewSku({ ...newSku, series: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
-                  />
+                  >
+                    {INITIAL_SERIES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Ukuran</label>
                   <input
                     type="text"
                     required
-                    placeholder="4, 6, 8, 10"
+                    placeholder="4, 6, 8, 10, 12"
                     value={newSku.size}
                     onChange={e => setNewSku({ ...newSku, size: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
@@ -694,7 +933,7 @@ export default function App() {
                   <option value="">-- Pilih Variasi SKU --</option>
                   {inventoryData.map(i => (
                     <option key={i.id} value={i.id}>
-                      {i.skuCode} | {i.series} - {i.color} ({i.size}) [Stok: {i.actualStock}]
+                      {i.skuCode} | {i.color} - {i.series} (Size {i.size}) [Stok: {i.actualStock}]
                     </option>
                   ))}
                 </select>
